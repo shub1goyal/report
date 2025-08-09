@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Corporate Report Finder</title>
+    <meta name="theme-color" content="#0ea5e9" />
+
+    <!-- Tailwind CSS via CDN with dark mode = class -->
+    <script>
+      window.tailwind = window.tailwind || {};
+      window.tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                DEFAULT: '#2563eb',
+                50: '#eff6ff',
+                100: '#dbeafe',
+                200: '#bfdbfe',
+                300: '#93c5fd',
+                400: '#60a5fa',
+                500: '#3b82f6',
+                600: '#2563eb',
+                700: '#1d4ed8',
+                800: '#1e40af',
+                900: '#1e3a8a'
+              }
+            }
+          }
+        }
+      };
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+      html, body { height: 100%; }
+      body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+      .hidden-vis { display: none !important; }
+      /* Improve readability of disabled submit button */
+      #submitBtn:disabled {
+        background-color: #e5e7eb !important; /* gray-200 */
+        color: #374151 !important; /* gray-700 text for contrast */
+        border: 1px solid #d1d5db; /* gray-300 */
+      }
+    </style>
+
+    <!-- Import Map for ESM modules via esm.sh -->
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/genai": "https://esm.sh/@google/genai@0.13.0"
+        }
+      }
+    </script>
+  </head>
+  <body class="min-h-full bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+    <div class="flex min-h-full flex-col">
+      <!-- Header -->
+      <header class="sticky top-0 z-10 border-b border-gray-200 bg-white/80 backdrop-blur shadow-sm dark:border-gray-800 dark:bg-gray-950/70">
+        <div class="mx-auto flex w-full max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+          <div class="flex items-center gap-3">
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-600 text-white shadow">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6" aria-hidden="true">
+                <path d="M3.75 6.75A2.25 2.25 0 016 4.5h6a2.25 2.25 0 012.25 2.25V9H18a2.25 2.25 0 012.25 2.25v6A2.25 2.25 0 0118 19.5H9a2.25 2.25 0 01-2.25-2.25V15H6A2.25 2.25 0 013.75 12.75v-6z" />
+                <path d="M9 15v2.25c0 .414.336.75.75.75H18a.75.75 0 00.75-.75v-6a.75.75 0 00-.75-.75h-3.75A2.25 2.25 0 0012 12.75V15H9z" />
+              </svg>
+            </div>
+            <h1 class="text-lg font-semibold sm:text-xl">Corporate Report Finder</h1>
+          </div>
+          <button id="toggleTheme" class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+            Toggle theme
+          </button>
+        </div>
+      </header>
+
+      <!-- Main -->
+      <main class="mx-auto w-full max-w-4xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <div class="space-y-6">
+          <!-- Search Form Card -->
+          <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+            <form id="searchForm" class="space-y-6">
+              <div class="grid grid-cols-1 gap-5">
+                <div class="flex flex-col gap-1.5">
+                  <label for="apiKey" class="text-sm font-medium text-gray-700 dark:text-gray-200">API Key</label>
+                  <input id="apiKey" name="apiKey" type="password" placeholder="Enter your Gemini API key" list="apiKeySuggestions" class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm shadow-sm outline-none ring-primary-500 transition focus:border-primary-500 focus:ring-2 dark:border-gray-700 dark:bg-gray-900" required />
+                  <label class="mt-2 inline-flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <input id="rememberKey" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-700" />
+                    <span>Remember API key on this device (stores locally)</span>
+                  </label>
+                </div>
+                <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  <div class="flex flex-col gap-1.5">
+                    <label for="company" class="text-sm font-medium text-gray-700 dark:text-gray-200">Company / Website</label>
+                    <input id="company" name="company" type="text" placeholder="e.g., Google or apple.com" class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm shadow-sm outline-none ring-primary-500 transition focus:border-primary-500 focus:ring-2 dark:border-gray-700 dark:bg-gray-900" required />
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Examples: <span class="italic">apple.com</span>, <span class="italic">Microsoft</span>, <span class="italic">tesla.com</span></p>
+                  </div>
+                  <div class="flex flex-col gap-1.5 sm:col-span-1">
+                    <label for="query" class="text-sm font-medium text-gray-700 dark:text-gray-200">Research Query</label>
+                    <textarea id="query" name="query" placeholder="e.g., Find the latest sustainability report and provide a summary with links." list="querySuggestions" class="min-h-[140px] w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm shadow-sm outline-none ring-primary-500 transition focus:border-primary-500 focus:ring-2 dark:border-gray-700 dark:bg-gray-900" required></textarea>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Tip: Add keywords like <span class="italic">annual report PDF</span>, <span class="italic">10-K</span>, <span class="italic">ESG</span>, <span class="italic">CDP</span>.</p>
+                  </div>
+                </div>
+              </div>
+                             <div class="mt-2 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+                 <div class="flex flex-col gap-2">
+                   <div id="quickChips" class="flex flex-wrap gap-2">
+                     <button type="button" data-chip="ir" class="rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">IR</button>
+                     <button type="button" data-chip="sec" class="rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">SEC/EDGAR</button>
+                     <button type="button" data-chip="cdp" class="rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">CDP</button>
+                   </div>
+                   <div class="flex flex-wrap items-center gap-4 text-xs text-gray-600 dark:text-gray-300">
+                     <label class="inline-flex items-center gap-2">
+                       <input id="deepResearch" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-700" />
+                       <span>Deep research</span>
+                     </label>
+                     <label class="inline-flex items-center gap-2">
+                       <input id="strictVerify" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-700" />
+                       <span>Strict link verification</span>
+                     </label>
+                   </div>
+                 </div>
+                 <button id="submitBtn" type="submit" title="Find report" aria-label="Find report" class="inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold shadow transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:ring-offset-gray-950 sm:w-auto bg-primary-600 text-white hover:bg-primary-700 opacity-60 cursor-not-allowed" disabled>
+                   <svg id="submitIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5" aria-hidden>
+                     <path fill-rule="evenodd" d="M2.25 12l18-9-9 18-2.25-6L2.25 12z" clip-rule="evenodd" />
+                   </svg>
+                   <span id="submitText">Find report</span>
+                 </button>
+               </div>
+            </form>
+          </section>
+
+          <!-- Loading State -->
+          <section id="loadingCard" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-950 hidden-vis">
+            <div class="flex flex-col items-center justify-center py-4">
+              <div class="h-10 w-10 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" aria-hidden="true"></div>
+              <p class="mt-3 text-sm text-gray-600 dark:text-gray-300">Analyzing sources...</p>
+            </div>
+          </section>
+
+          <!-- Error State -->
+          <section id="errorCard" class="rounded-xl border border-red-300 bg-red-50 p-4 text-red-900 dark:border-red-800 dark:bg-red-950/50 dark:text-red-200 hidden-vis" role="alert" aria-live="assertive">
+            <div class="flex items-start gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="mt-0.5 h-5 w-5" aria-hidden="true">
+                <path fill-rule="evenodd" d="M10.29 3.86c.86-1.5 3.06-1.5 3.92 0l7.71 13.5c.86 1.5-.22 3.39-1.96 3.39H4.54c-1.74 0-2.83-1.9-1.96-3.39l7.71-13.5zM12 8.25a.75.75 0 00-.75.75v4.5a.75.75 0 001.5 0V9a.75.75 0 00-.75-.75zm0 8.25a.9.9 0 100-1.8.9.9 0 000 1.8z" clip-rule="evenodd" />
+              </svg>
+              <p id="errorText" class="font-medium">Error</p>
+            </div>
+          </section>
+
+          <!-- Result State -->
+          <section id="resultCard" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-950 hidden-vis">
+            <div class="space-y-8">
+              <section>
+                <h2 class="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">Analyst Report</h2>
+                <div id="reportText" class="prose max-w-none whitespace-pre-wrap text-gray-800 dark:prose-invert dark:text-gray-200"></div>
+              </section>
+              <section>
+                <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Verified Sources</h3>
+                <ul id="sourcesList" class="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:divide-gray-800 dark:border-gray-800"></ul>
+              </section>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <!-- Footer -->
+      <footer class="sticky top-[100vh] border-t border-gray-200 bg-white/70 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-950/70">
+        <div class="mx-auto w-full max-w-4xl px-4 text-sm text-gray-500 dark:text-gray-400">
+          Built with Gemini and Grounding • Corporate Report Finder
+        </div>
+      </footer>
+    </div>
+
+    <datalist id="apiKeySuggestions"></datalist>
+    <datalist id="querySuggestions"></datalist>
+
+    <!-- App logic -->
+    <script type="module">
+      import { GoogleGenAI } from '@google/genai';
+
+      const el = (id) => document.getElementById(id);
+      const form = el('searchForm');
+      const apiKeyInput = el('apiKey');
+      const rememberKey = el('rememberKey');
+      const companyInput = el('company');
+      const queryInput = el('query');
+      const apiKeySuggestions = el('apiKeySuggestions');
+      const querySuggestions = el('querySuggestions');
+      const deepResearch = el('deepResearch');
+      const strictVerify = el('strictVerify');
+      const submitBtn = el('submitBtn');
+      const submitIcon = el('submitIcon');
+      const submitText = el('submitText');
+
+      const loadingCard = el('loadingCard');
+      const errorCard = el('errorCard');
+      const errorText = el('errorText');
+      const resultCard = el('resultCard');
+      const reportText = el('reportText');
+      const sourcesList = el('sourcesList');
+
+      const toggleThemeBtn = el('toggleTheme');
+      toggleThemeBtn.addEventListener('click', () => {
+        const root = document.documentElement;
+        const isDark = root.classList.toggle('dark');
+        try { localStorage.setItem('theme', isDark ? 'dark' : 'light'); } catch {}
+      });
+
+      // Quick chips augment
+      const chipsContainer = el('quickChips');
+      chipsContainer.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-chip]');
+        if (!btn) return;
+        const chip = btn.getAttribute('data-chip');
+        const c = (companyInput.value || '').trim();
+        const domain = c.includes('.') ? c.replace(/^https?:\/\//,'').replace(/\/$/,'') : '';
+        if (chip === 'ir') {
+          queryInput.value = `${queryInput.value}`.trim() + (domain ? ` site:${domain} investor relations OR esg OR sustainability report` : ' investor relations OR esg OR sustainability report');
+        } else if (chip === 'sec') {
+          queryInput.value = `${queryInput.value}`.trim() + ` site:sec.gov 10-k OR 20-f OR annual report pdf`;
+        } else if (chip === 'cdp') {
+          queryInput.value = `${queryInput.value}`.trim() + ` site:cdp.net CDP report pdf`;
+        }
+        updateButtonState();
+        queryInput.focus();
+      });
+      // Initialize theme from localStorage
+      try { if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark'); } catch {}
+
+      // History helpers
+      function loadHistory(key, fallback=[]) {
+        try { return JSON.parse(localStorage.getItem(key) || 'null') || fallback; } catch { return fallback; }
+      }
+      function saveHistory(key, arr, max=10) {
+        try {
+          const unique = Array.from(new Set(arr.filter(Boolean)));
+          localStorage.setItem(key, JSON.stringify(unique.slice(0, max)));
+        } catch {}
+      }
+      function populateDatalist(datalist, values) {
+        datalist.innerHTML = '';
+        values.forEach(v => {
+          const opt = document.createElement('option');
+          opt.value = v; datalist.appendChild(opt);
+        });
+      }
+
+      const KEY_HISTORY = 'crf_api_keys';
+      const QUERY_HISTORY = 'crf_queries';
+
+      const keyHistory = loadHistory(KEY_HISTORY);
+      const queryHistory = loadHistory(QUERY_HISTORY);
+      populateDatalist(apiKeySuggestions, keyHistory);
+      populateDatalist(querySuggestions, queryHistory);
+
+      // Pre-fill remembered API key if lastUsed stored separately
+      try {
+        const lastKey = localStorage.getItem('crf_last_api_key');
+        if (lastKey) apiKeyInput.value = lastKey;
+      } catch {}
+
+      function setDisabled(disabled) {
+        apiKeyInput.disabled = disabled;
+        companyInput.disabled = disabled;
+        queryInput.disabled = disabled;
+        submitBtn.disabled = disabled || !canSubmit();
+        // Visual enable/disable for the button
+        if (submitBtn.disabled) {
+          submitBtn.classList.add('opacity-60','cursor-not-allowed');
+        } else {
+          submitBtn.classList.remove('opacity-60','cursor-not-allowed');
+        }
+      }
+
+      function canSubmit() {
+        return apiKeyInput.value.trim() && companyInput.value.trim() && queryInput.value.trim();
+      }
+
+      function updateButtonState() {
+        submitBtn.disabled = !canSubmit();
+        if (submitBtn.disabled) {
+          submitBtn.classList.add('opacity-60','cursor-not-allowed');
+        } else {
+          submitBtn.classList.remove('opacity-60','cursor-not-allowed');
+        }
+      }
+
+      [apiKeyInput, companyInput, queryInput].forEach((i) => i.addEventListener('input', updateButtonState));
+
+      function show(elm) { elm.classList.remove('hidden-vis'); }
+      function hide(elm) { elm.classList.add('hidden-vis'); }
+
+      function sanitizeUrl(u) {
+        try { return u.replace(/[)\]\.,;:!\?]+$/, ''); } catch { return u; }
+      }
+
+      function linkify(text) {
+        const urlRegex = /(https?:\/\/[^\s\]\)]+)/gi; // stop at whitespace, ] or )
+        const out = [];
+        let lastIndex = 0; let match;
+        while ((match = urlRegex.exec(text)) !== null) {
+          let url = sanitizeUrl(match[1] || match[0]);
+          const start = match.index;
+          if (start > lastIndex) out.push(document.createTextNode(text.slice(lastIndex, start)));
+          const a = document.createElement('a');
+          a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+          a.className = 'text-primary-600 underline decoration-primary-400 underline-offset-2 hover:decoration-2 dark:text-primary-400';
+          a.textContent = url; out.push(a);
+          lastIndex = start + (match[0]?.length || url.length);
+        }
+        if (lastIndex < text.length) out.push(document.createTextNode(text.slice(lastIndex)));
+        return out;
+      }
+
+      function buildPrompt(company, query) {
+        const deep = deepResearch?.checked ? 'Perform deep research: try multiple queries, consider synonyms, and check multiple official repositories.' : '';
+        const strict = strictVerify?.checked ? 'Only include links that are publicly reachable (HTTP 200) and not paywalled. Exclude any links that time out or redirect to generic landing pages.' : '';
+        return [
+          'Role: You are a highly specialized research analyst.',
+          'Objective: Find an official corporate report (ideally a PDF) for the given company and query.',
+          'Search strategy:',
+          '- Use Google Search grounding. If the input looks like a domain (e.g., apple.com), prefer results from that domain using site filters. Prefer results with filetype:pdf when seeking reports.',
+          '- Where relevant, also search official stock exchange/issuer pages (e.g., SEC/EDGAR for US, LSE, ASX, HKEX) and CDP (Carbon Disclosure Project, cdp.net) for ESG disclosures.',
+          deep,
+          'Link requirements:',
+          '- Return only working public URLs. Prefer direct PDF links hosted on the official company domain or its subdomains.',
+          '- Avoid third-party aggregators, preview/translation/cache pages, and tracking URLs.',
+          '- If a direct PDF is not available, include the official Investor Relations / ESG page on the company site.',
+          strict,
+          'Output requirements:',
+          '- Start with a one-sentence conclusion.',
+          "- State the report's title and period if applicable.",
+          '- Include the full, raw URL(s) directly in your summary text.',
+          '- Include at most 2–4 links and ensure at least one is a direct PDF if available.',
+          'Contingency: If no suitable official report or page is found, clearly state that.',
+          '',
+          `Company: ${company}`,
+          `Research Query: ${query}`,
+          '',
+          'Now produce the Analyst Report as described.'
+        ].filter(Boolean).join('\n');
+      }
+
+      async function findReport(apiKey, company, query) {
+        const ai = new GoogleGenAI({ apiKey });
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: buildPrompt(company, query),
+          config: { tools: [{ googleSearch: {} }] },
+        });
+
+        const text = response.text ?? '';
+
+        // Collect sources from grounding chunks
+        const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
+        const webChunkSources = chunks
+          .map((c) => c?.web)
+          .filter((w) => w && w.uri)
+          .map((w) => ({ title: w.title || w.uri, uri: w.uri }));
+
+        // Collect URLs that appear directly in the model text
+        const urlRegex = /(https?:\/\/[^\s\]\)]+)/gi;
+        const textUrls = new Set();
+        let m;
+        while ((m = urlRegex.exec(text)) !== null) {
+          const clean = (m[1] || m[0] || '').replace(/[)\]\.,;:!\?]+$/, '');
+          if (clean) textUrls.add(clean);
+        }
+        const textSources = Array.from(textUrls).map((u) => ({ title: u, uri: u }));
+
+        // Merge, dedupe, and rank: prefer PDFs and URLs on the company domain
+        const merged = [...webChunkSources, ...textSources];
+        const dedupMap = new Map();
+        merged.forEach((s) => {
+          try {
+            const key = new URL(s.uri).href;
+            if (!dedupMap.has(key)) dedupMap.set(key, s);
+          } catch { /* ignore invalid URLs */ }
+        });
+        const deduped = Array.from(dedupMap.values());
+
+        const companyDomain = (() => {
+          const c = company.trim().toLowerCase();
+          if (c.includes('.')) return c.replace(/^https?:\/\//, '').replace(/\/$/, '');
+          return '';
+        })();
+
+        // Optional live verification to ensure URLs are reachable
+        async function verifyUrl(u) {
+          // Try CORS-friendly HEAD first; if blocked, fall back to GET, then final PDF hint
+          try {
+            const resp = await fetch(u, { method: 'HEAD', cache: 'no-cache', redirect: 'follow' });
+            if (resp.status >= 200 && resp.status < 400) return true;
+          } catch {}
+          try {
+            const resp2 = await fetch(u, { method: 'GET', cache: 'no-cache', redirect: 'follow' });
+            // Accept if OK and not HTML error; prefer PDF or text/plain over HTML if possible
+            const ct = resp2.headers.get('content-type') || '';
+            if ((resp2.status >= 200 && resp2.status < 400) && !/text\/html/i.test(ct)) return true;
+            // If it looks like a PDF by URL pattern, keep as a weak positive
+            if (/\.pdf(\?|$)/i.test(u)) return resp2.ok || resp2.status === 0;
+          } catch {}
+          return false;
+        }
+
+        const scored = deduped.map((s) => {
+          let score = 0;
+          if (/\.pdf(\?|$)/i.test(s.uri)) score += 10;
+          if (companyDomain) {
+            try {
+              const h = new URL(s.uri).hostname.toLowerCase();
+              if (h === companyDomain || h.endsWith('.' + companyDomain)) score += 6;
+              if (/sec\.gov|cdp\.net|carbon\.?disclosure\.?project|investorrelations?\.|ir\./i.test(h)) score += 3;
+            } catch {}
+          }
+          if (/(investor|ir|esg|sustainab|report|annual|10-k|20-f|brrs|brsr)/i.test(s.uri)) score += 2;
+          return { ...s, _score: score };
+        });
+
+        scored.sort((a, b) => b._score - a._score);
+
+        let verified = scored;
+        if (strictVerify?.checked) {
+          // Verify top 15 only for speed
+          const sample = scored.slice(0, 15);
+          const checks = await Promise.all(sample.map(async (s) => ({ s, ok: await verifyUrl(s.uri) })));
+          verified = checks.filter(c => c.ok).map(c => c.s);
+          // If nothing verified, degrade gracefully to scored top 5 to avoid empty UI
+          if (verified.length === 0) verified = scored.slice(0, 5);
+        }
+
+        const sources = verified.map(({ title, uri }) => ({ title, uri }));
+
+        return { text, sources };
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!canSubmit()) return;
+
+        hide(errorCard);
+        hide(resultCard);
+        show(loadingCard);
+        setDisabled(true);
+        submitText.textContent = 'Searching...';
+        submitIcon.style.display = 'none';
+
+        try {
+          const apiKey = apiKeyInput.value.trim();
+          const company = companyInput.value.trim();
+          const query = queryInput.value.trim();
+
+          // Save history
+          if (rememberKey.checked && apiKey) {
+            const updatedKeys = [apiKey, ...loadHistory(KEY_HISTORY)];
+            saveHistory(KEY_HISTORY, updatedKeys, 5);
+            try { localStorage.setItem('crf_last_api_key', apiKey); } catch {}
+            populateDatalist(apiKeySuggestions, loadHistory(KEY_HISTORY));
+          }
+          if (query) {
+            const updatedQueries = [query, ...loadHistory(QUERY_HISTORY)];
+            saveHistory(QUERY_HISTORY, updatedQueries, 15);
+            populateDatalist(querySuggestions, loadHistory(QUERY_HISTORY));
+          }
+
+          const data = await findReport(apiKey, company, query);
+
+          // Render text
+          reportText.textContent = '';
+          const fragments = linkify(data.text);
+          fragments.forEach((node) => reportText.appendChild(node));
+
+          // Render sources (top 6 max for clarity)
+          sourcesList.innerHTML = '';
+          const topSources = data.sources.slice(0, 6);
+          if (topSources.length === 0) {
+            const li = document.createElement('li');
+            li.className = 'p-4 text-sm text-gray-600 dark:text-gray-300';
+            li.textContent = 'No sources were returned by grounding metadata or model text.';
+            sourcesList.appendChild(li);
+          } else {
+            topSources.forEach((s, idx) => {
+              const li = document.createElement('li');
+              li.className = 'flex flex-col gap-1 p-4';
+
+              const a = document.createElement('a');
+              a.href = s.uri; a.target = '_blank'; a.rel = 'noopener noreferrer';
+              a.className = 'inline-flex items-start gap-2 text-primary-600 hover:underline dark:text-primary-400';
+
+              const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+              icon.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+              icon.setAttribute('viewBox', '0 0 24 24');
+              icon.setAttribute('fill', 'currentColor');
+              icon.setAttribute('class', 'mt-0.5 h-4 w-4 flex-none');
+              const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+              path.setAttribute('d', 'M13.5 3a1.5 1.5 0 011.5 1.5V6h1.5A3 3 0 0120 9v7.5A3 3 0 0117 19.5H7A3 3 0 014 16.5V9a3 3 0 013-3h1.5V4.5A1.5 1.5 0 0110 3h3.5zM9 6v1.5h6V6H9z');
+              icon.appendChild(path);
+
+              const titleSpan = document.createElement('span');
+              titleSpan.className = 'font-medium';
+              titleSpan.textContent = s.title;
+
+              a.appendChild(icon);
+              a.appendChild(titleSpan);
+
+              const uriSpan = document.createElement('span');
+              uriSpan.className = 'break-words text-xs text-gray-500 dark:text-gray-400';
+              uriSpan.textContent = s.uri;
+
+              li.appendChild(a);
+              li.appendChild(uriSpan);
+              sourcesList.appendChild(li);
+            });
+          }
+
+          show(resultCard);
+        } catch (err) {
+          errorText.textContent = err?.message || 'Something went wrong. Please try again.';
+          show(errorCard);
+        } finally {
+          hide(loadingCard);
+          setDisabled(false);
+          submitText.textContent = 'Find Report';
+          submitIcon.style.display = '';
+        }
+      });
+
+      // Initialize button state
+      updateButtonState();
+    </script>
+  </body>
+</html> 
